@@ -1,5 +1,6 @@
 # cython: language_level=3, boundscheck=False, wraparound=False
 
+from cython.parallel cimport prange
 from numpy.math cimport expl, logl, log1pl, isinf, fabsl, INFINITY
 import numpy as np
 
@@ -59,7 +60,7 @@ def forward_log(dtype_t[:] log_startprob,
         for i in range(nc):
             fwdlattice[0, i] = log_startprob[i] + framelogprob[0, i]
         for t in range(1, ns):
-            for j in range(nc):
+            for j in prange(nc):
                 for i in range(nc):
                     tmp_buf[i] = fwdlattice[t-1, i] + log_transmat[i, j]
                 fwdlattice[t, j] = _logsumexp(tmp_buf) + framelogprob[t, j]
@@ -96,7 +97,7 @@ def forward_scaling(dtype_t[:] startprob,
 
         # Compute rest of Alpha
         for t in range(1, ns):
-            for j in range(nc):
+            for j in prange(nc):
                 for i in range(nc):
                     fwdlattice[t, j] += fwdlattice[t-1, i] * transmat[i, j]
                 fwdlattice[t, j] *= frameprob[t, j]
@@ -128,7 +129,7 @@ def backward_log(dtype_t[:] log_startprob,
         for i in range(nc):
             bwdlattice[ns-1, i] = 0
         for t in range(ns-2, -1, -1):
-            for i in range(nc):
+            for i in prange(nc):
                 for j in range(nc):
                     tmp_buf[j] = (log_transmat[i, j]
                                   + framelogprob[t+1, j]
@@ -152,7 +153,7 @@ def backward_scaling(dtype_t[:] startprob,
         bwdlattice[:] = 0
         bwdlattice[ns-1, :] = scaling_factors[ns-1]
         for t in range(ns-2, -1, -1):
-            for j in range(nc):
+            for j in prange(nc):
                 for i in range(nc):
                     bwdlattice[t, j] += (transmat[j, i]
                                          * frameprob[t+1, i]
@@ -171,7 +172,7 @@ def compute_log_xi_sum(dtype_t[:, :] fwdlattice,
     cdef dtype_t log_xi, logprob = _logsumexp(fwdlattice[ns-1])
     with nogil:
         for t in range(ns-1):
-            for i in range(nc):
+            for i in prange(nc):
                 for j in range(nc):
                     log_xi = (fwdlattice[t, i]
                               + log_transmat[i, j]
@@ -191,7 +192,7 @@ def compute_scaling_xi_sum(dtype_t[:, :] fwdlattice,
     cdef int t, i, j
     with nogil:
         for t in range(ns-1):
-            for i in range(nc):
+            for i in prange(nc):
                 for j in range(nc):
                     xi_sum[i, j] += (fwdlattice[t, i]
                                      * transmat[i, j]
@@ -217,7 +218,7 @@ def viterbi(dtype_t[:] log_startprob,
 
         # Induction
         for t in range(1, ns):
-            for i in range(nc):
+            for i in prange(nc):
                 for j in range(nc):
                     tmp_buf[j] = log_transmat[j, i] + viterbi_lattice[t-1, j]
 

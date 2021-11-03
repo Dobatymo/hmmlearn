@@ -9,6 +9,42 @@ import setuptools
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
+import platform
+import sys
+machine = platform.machine().lower()
+x86 = ("x86_64", "amd64", "i386", "x86", "i686")
+OPENMP = True
+FASTMATH = False
+
+cflags = []
+
+if sys.platform.startswith("linux"):
+    if machine in x86:
+        cflags += ["-O2", "-mavx2"]
+    else:
+        cflags += ["-O2"]
+elif sys.platform == "win32":
+    if machine in x86:
+        cflags += ["/O2", "/arch:AVX2"]
+    else:
+        cflags += ["/O2"]
+elif sys.platform == "darwin":
+    if machine in x86:
+        cflags += ["-O2", "-mavx2"]
+    else:
+        cflags += ["-O2"]
+
+if OPENMP:
+    if sys.platform == "win32":
+        cflags += ["/openmp"]
+    else:
+        cflags += ["-fopenmp"]
+
+if FASTMATH:
+    if sys.platform == "win32":
+        cflags += ["/fp:fast"]
+    else:
+        cflags += ["-ffast-math"]
 
 class build_ext(build_ext):
 
@@ -25,15 +61,9 @@ class build_ext(build_ext):
             for k, v in np.distutils.misc_util.get_info("npymath").items():
                 setattr(ext, k, v)
             ext.include_dirs = [np.get_include()]
+            ext.extra_compile_args=cflags
 
         super().finalize_options()
-
-    def build_extensions(self):
-        try:
-            self.compiler.compiler_so.remove("-Wstrict-prototypes")
-        except (AttributeError, ValueError):
-            pass
-        super().build_extensions()
 
 
 setup(
